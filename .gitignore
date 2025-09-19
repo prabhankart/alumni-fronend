@@ -1,0 +1,29 @@
+# Node
+node_modules/
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+
+# Build outputs
+dist/
+build/
+.vite/
+.cache/
+
+# Env files
+.env
+.env.*
+!.env.example
+
+# Coverage / tests
+coverage/
+.vitest/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Misc
+*.local

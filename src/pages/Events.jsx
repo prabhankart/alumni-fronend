@@ -1,46 +1,51 @@
 import { useEffect, useState } from "react";
-import api from "../api";
+import API from "../api";
 import Card from "../components/Card";
 
 export default function Events() {
-  const [items, setItems] = useState([]);
-  const [form, setForm] = useState({ title: "", date: "", venue: "", description: "" });
+  const [list, setList] = useState([]);                 // always an array
+  const [form, setForm] = useState({ title:"", date:"", mode:"Online", location:"", description:"" });
+  const [busy, setBusy] = useState(false);
 
-  async function load() {
-    const res = await api.get("/api/events");
-    setItems(res.data);
-  }
+  const load = () =>
+    API.get("/api/events")
+      .then(res => setList(Array.isArray(res.data) ? res.data : (res.data?.data || [])))
+      .catch(()=> setList([]));
 
   useEffect(() => { load(); }, []);
 
-  async function create(e) {
+  const submit = async (e) => {
     e.preventDefault();
-    if (!form.title || !form.date) return alert("Please enter title & date");
+    if (!form.title || !form.date) return alert("Title & Date required");
+    setBusy(true);
     try {
-      const res = await api.post("/api/events", form);
-      setItems(prev => [...prev, res.data]);
-      setForm({ title: "", date: "", venue: "", description: "" });
-    } catch {
-      alert("Failed to create event");
+      await API.post("/api/events", form);
+      await load();                                      // pull fresh list
+      setForm({ title:"", date:"", mode:"Online", location:"", description:"" });
+    } finally {
+      setBusy(false);
     }
-  }
+  };
 
   return (
-    <div className="container py-8">
-      <h1 className="text-3xl font-bold">Events</h1>
-
-      <form className="card mt-4 grid md:grid-cols-4 gap-3" onSubmit={create}>
-        <input className="input" placeholder="Title" value={form.title} onChange={e=>setForm({...form, title:e.target.value})} />
-        <input className="input" type="date" value={form.date} onChange={e=>setForm({...form, date:e.target.value})} />
-        <input className="input" placeholder="Venue" value={form.venue} onChange={e=>setForm({...form, venue:e.target.value})} />
-        <button className="btn" type="submit">Create Event</button>
-        <textarea className="input md:col-span-4" rows="3" placeholder="Description" value={form.description} onChange={e=>setForm({...form, description:e.target.value})} />
+    <div className="container py-6 grid lg:grid-cols-2 gap-6">
+      <form onSubmit={submit} className="card grid gap-3">
+        <h3 className="font-semibold text-lg">Create Event</h3>
+        <input className="input" placeholder="Title" value={form.title} onChange={e=>setForm({...form,title:e.target.value})}/>
+        <input className="input" type="date" value={form.date} onChange={e=>setForm({...form,date:e.target.value})}/>
+        <select className="input" value={form.mode} onChange={e=>setForm({...form,mode:e.target.value})}>
+          <option>Online</option><option>Offline</option><option>Hybrid</option>
+        </select>
+        <input className="input" placeholder="Location" value={form.location} onChange={e=>setForm({...form,location:e.target.value})}/>
+        <textarea className="input" placeholder="Description" value={form.description} onChange={e=>setForm({...form,description:e.target.value})}/>
+        <button className="btn" disabled={busy}>{busy ? "Saving..." : "Save Event"}</button>
       </form>
 
-      <div className="grid-cards mt-6">
-        {items.map(e => (
-          <Card key={e.id} title={e.title} subtitle={e.venue || "—"} right={<span className="text-slate-400 text-sm">{e.date}</span>}>
-            <p className="text-slate-300 text-sm">{e.description}</p>
+      <div className="grid-cards">
+        {list.map(e => (
+          <Card key={e._id || e.id} title={e.title} subtitle={`${(e.date||"").slice(0,10)} • ${e.mode || ""}`}>
+            <div className="text-sm text-slate-300">{e.location}</div>
+            <p className="mt-1 text-sm">{e.description}</p>
           </Card>
         ))}
       </div>

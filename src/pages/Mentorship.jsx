@@ -1,56 +1,52 @@
 import { useEffect, useState } from "react";
-import api from "../api";
+import API from "../api";
 import Card from "../components/Card";
 
 export default function Mentorship() {
-  const [items, setItems] = useState([]);
-  const [form, setForm] = useState({ name: "", skills: "", availability: "", contact: "" });
+  const [mentors, setMentors] = useState([]);           // always an array
+  const [form, setForm] = useState({ name:"", email:"", mentorId:"", message:"" });
 
-  async function load() {
-    const res = await api.get("/api/mentors");
-    setItems(res.data);
-  }
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    API.get("/api/mentors")
+      .then(res => setMentors(Array.isArray(res.data) ? res.data : (res.data?.data || [])))
+      .catch(()=> setMentors([]));
+  }, []);
 
-  async function signup(e) {
+  const submit = async (e) => {
     e.preventDefault();
+    if (!form.name || !form.email || !form.mentorId) return alert("Fill all required fields");
     try {
-      const body = {
-        name: form.name.trim(),
-        skills: form.skills.split(",").map(s=>s.trim()).filter(Boolean),
-        availability: form.availability.trim(),
-        contact: form.contact.trim()
-      };
-      const res = await api.post("/api/mentors", body);
-      setItems(prev => [...prev, res.data]);
-      setForm({ name: "", skills: "", availability: "", contact: "" });
-    } catch (e) {
-      alert("Invalid details. Please check email and skills.");
+      await API.post("/api/mentors/apply", form);
+      alert("Applied successfully!");
+      setForm({ name:"", email:"", mentorId:"", message:"" });
+    } catch (err) {
+      alert(err?.response?.data?.error || "Invalid details");
     }
-  }
+  };
 
   return (
-    <div className="container py-8">
-      <h1 className="text-3xl font-bold">Mentorship</h1>
-
-      <form className="card mt-4 grid md:grid-cols-4 gap-3" onSubmit={signup}>
-        <input className="input" placeholder="Your Name" value={form.name} onChange={e=>setForm({...form, name:e.target.value})} />
-        <input className="input" placeholder="Skills (comma separated)" value={form.skills} onChange={e=>setForm({...form, skills:e.target.value})} />
-        <input className="input" placeholder="Availability (e.g., Weekends)" value={form.availability} onChange={e=>setForm({...form, availability:e.target.value})} />
-        <input className="input" placeholder="Email" value={form.contact} onChange={e=>setForm({...form, contact:e.target.value})} />
-        <button className="btn md:col-span-4" type="submit">Become a Mentor</button>
-      </form>
-
-      <div className="grid-cards mt-6">
-        {items.map(m => (
-          <Card key={m.id} title={m.name} subtitle={m.availability} right={<span className="text-sky-300 text-sm">{m.sessions} sessions</span>}>
-            <div className="text-sm text-slate-300">{m.contact}</div>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {m.skills?.map((s, i) => <span key={i} className="text-xs bg-slate-700 px-2 py-1 rounded-md">{s}</span>)}
+    <div className="container py-6 grid lg:grid-cols-2 gap-6">
+      <div className="grid-cards">
+        {mentors.map(m => (
+          <Card key={m._id || m.id} title={m.name} subtitle={`Slots: ${m.slots ?? 0}`}>
+            <div className="flex flex-wrap gap-2 mt-2">
+              {(m.expertise || []).map((x,i)=><span key={i} className="px-2 py-1 text-xs rounded-full bg-sky-900/40 border border-sky-700">{x}</span>)}
             </div>
           </Card>
         ))}
       </div>
+
+      <form onSubmit={submit} className="card grid gap-3">
+        <h3 className="font-semibold text-lg">Apply for Mentorship</h3>
+        <input className="input" placeholder="Your Name" value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/>
+        <input className="input" placeholder="Email" value={form.email} onChange={e=>setForm({...form,email:e.target.value})}/>
+        <select className="input" value={form.mentorId} onChange={e=>setForm({...form,mentorId:e.target.value})}>
+          <option value="">Select Mentor</option>
+          {mentors.map(m => <option key={m._id || m.id} value={m._id || m.id}>{m.name}</option>)}
+        </select>
+        <textarea className="input" placeholder="Message (optional)" value={form.message} onChange={e=>setForm({...form,message:e.target.value})}/>
+        <button className="btn">Apply</button>
+      </form>
     </div>
   );
 }

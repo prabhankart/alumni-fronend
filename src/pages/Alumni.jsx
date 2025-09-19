@@ -1,71 +1,62 @@
 import { useEffect, useMemo, useState } from "react";
-import api from "../api";
+import API from "../api";
 import Card from "../components/Card";
 import SearchBar from "../components/SearchBar";
 
 export default function Alumni() {
+  const [items, setItems] = useState([]);               // always an array
   const [q, setQ] = useState("");
   const [batch, setBatch] = useState("");
   const [profession, setProfession] = useState("");
-  const [sort, setSort] = useState("name");
+  const [sort, setSort] = useState("");
   const [order, setOrder] = useState("asc");
-  const [items, setItems] = useState([]);
-  const [total, setTotal] = useState(0);
 
-  async function fetchData() {
-    const params = new URLSearchParams();
-    if (q) params.set("q", q);
-    if (batch) params.set("batch", batch);
-    if (profession) params.set("profession", profession);
-    if (sort) params.set("sort", sort);
-    if (order) params.set("order", order);
-    const res = await api.get(`/api/alumni?${params.toString()}`);
-    setItems(res.data.data);
-    setTotal(res.data.total);
-  }
+  useEffect(() => {
+    API.get("/api/alumni")
+      .then(res => {
+        const arr = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+        setItems(arr);
+      })
+      .catch(() => setItems([]));
+  }, []);
 
-  useEffect(() => { fetchData(); }, [q, batch, profession, sort, order]);
+  const batches = useMemo(() => [...new Set(items.map(a => a.batch).filter(Boolean))], [items]);
+  const professions = useMemo(() => [...new Set(items.map(a => a.profession).filter(Boolean))], [items]);
 
-  const batches = useMemo(() => {
-    const s = new Set(items.map(i => String(i.batch)));
-    return Array.from(s).sort();
-  }, [items]);
+  const filtered = useMemo(() => {
+    const s = q.trim().toLowerCase();
+    let list = items.filter(a => {
+      const t = [a.name, a.profession, ...(a.skills || [])].join(" ").toLowerCase();
+      const okQ = !s || t.includes(s);
+      const okB = !batch || a.batch === batch;
+      const okP = !profession || a.profession === profession;
+      return okQ && okB && okP;
+    });
+    if (sort === "name") list.sort((a,b)=> (a.name||"").localeCompare(b.name||"") * (order==="asc"?1:-1));
+    if (sort === "batch") list.sort((a,b)=> (String(a.batch)||"").localeCompare(String(b.batch)||"") * (order==="asc"?1:-1));
+    return list;
+  }, [items, q, batch, profession, sort, order]);
 
   return (
-    <div className="container py-8">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <h1 className="text-3xl font-bold">Alumni Directory</h1>
-        <div className="text-slate-400">Total: {total}</div>
-      </div>
-
-      <div className="mt-4 grid md:grid-cols-4 gap-3">
-        <SearchBar value={q} onChange={setQ} placeholder="Search name, skill, location..." />
-        <input className="input" placeholder="Batch (e.g., 2018)" value={batch} onChange={e=>setBatch(e.target.value)} />
-        <input className="input" placeholder="Profession (e.g., Data)" value={profession} onChange={e=>setProfession(e.target.value)} />
-        <div className="flex gap-2">
-          <select className="input" value={sort} onChange={e=>setSort(e.target.value)}>
-            <option value="name">Sort: Name</option>
-            <option value="batch">Sort: Batch</option>
-            <option value="profession">Sort: Profession</option>
-          </select>
-          <select className="input" value={order} onChange={e=>setOrder(e.target.value)}>
-            <option value="asc">Asc</option>
-            <option value="desc">Desc</option>
-          </select>
-        </div>
-      </div>
+    <div className="container py-6">
+      <SearchBar
+        q={q} setQ={setQ}
+        batch={batch} setBatch={setBatch} batches={batches}
+        profession={profession} setProfession={setProfession} professions={professions}
+        sort={sort} setSort={setSort} order={order} setOrder={setOrder}
+      />
 
       <div className="grid-cards mt-6">
-        {items.map(a => (
-          <Card key={a.id} title={a.name} subtitle={`${a.profession} • Batch ${a.batch}`} right={
-            a.linkedin ? <a className="text-sky-400 underline" href={a.linkedin} target="_blank">LinkedIn</a> : null
-          }>
-            <div className="text-sm text-slate-300">{a.location}</div>
-            {a.skills?.length > 0 && (
+        {filtered.map(a => (
+          <Card
+            key={a._id || a.id}
+            title={a.name}
+            subtitle={`${a.profession || "—"} • Batch ${a.batch || "—"}`}
+            right={a.linkedin ? <a className="text-sky-400 underline" href={a.linkedin} target="_blank" rel="noreferrer">LinkedIn</a> : null}
+          >
+            {(a.skills || []).length > 0 && (
               <div className="mt-2 flex flex-wrap gap-2">
-                {a.skills.map((s, i) => (
-                  <span key={i} className="text-xs bg-slate-700 px-2 py-1 rounded-md">{s}</span>
-                ))}
+                {(a.skills || []).map((s,i)=><span key={i} className="px-2 py-1 text-xs rounded-full bg-sky-900/40 border border-sky-700">{s}</span>)}
               </div>
             )}
           </Card>
